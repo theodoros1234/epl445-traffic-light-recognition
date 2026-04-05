@@ -18,7 +18,7 @@ pip install ultralytics PyYAML
 ### Find all unique classes
 
 ```
-./label-process.py find-all-classes <bstld_labels_file.yaml>
+python3 label-process.py find-all-classes <bstld_labels_file.yaml>
 ```
 
 Finds all unique classes in a BSTLD-formatted label file and prints them.
