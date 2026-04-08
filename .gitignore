@@ -1,6 +1,8 @@
 dataset*
-model
+model*
 pre-trained
+test_tfls_detection/images
+test_tfls_detection/results
 *.pt
 *.onnx
 *swp
