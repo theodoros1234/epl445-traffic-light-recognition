@@ -178,11 +178,16 @@ def convert_to_yolo(output, train_labels = None, test_labels = None, image_trans
           # transform bounding box coordinates to YOLO format:
           # value range: 0 to 1
           # params: class_id, x_center, y_center, width, height
+          x_min = min(max(box['x_min'], 0), WIDTH)
+          x_max = min(max(box['x_max'], 0), WIDTH)
+          y_min = min(max(box['y_min'], 0), HEIGHT)
+          y_max = min(max(box['y_max'], 0), HEIGHT)
+
           class_id = class_ids[box['label']]
-          x_center = (box['x_max'] + box['x_min']) / (WIDTH * 2)
-          y_center = (box['y_max'] + box['y_min']) / (HEIGHT * 2)
-          width = (box['x_max'] - box['x_min']) / WIDTH
-          height = (box['y_max'] - box['y_min']) / HEIGHT
+          x_center = (x_max + x_min) / (WIDTH * 2)
+          y_center = (y_max + y_min) / (HEIGHT * 2)
+          width = (x_max - x_min) / WIDTH
+          height = (y_max - y_min) / HEIGHT
           f.write("%d %f %f %f %f\n" % (class_id, x_center, y_center, width, height))
 
       # transfer image
