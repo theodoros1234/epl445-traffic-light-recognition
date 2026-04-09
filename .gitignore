@@ -1,6 +1,7 @@
 dataset*
 model*
 pre-trained
+runs
 test_tfls_detection/images
 test_tfls_detection/results
 *.pt

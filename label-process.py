@@ -141,10 +141,7 @@ def convert_to_yolo(output, train_labels = None, test_labels = None, image_trans
 
   # create yolo config
   print("Creating dataset config file")
-  config = {
-    "path": "data",
-    "names": classes_for_config
-  }
+  config = {"names": classes_for_config}
   # paths to subset dirs
   for subset in subsets:
     config[subset['type']] = os.path.join("images", subset['type'])
@@ -157,8 +154,8 @@ def convert_to_yolo(output, train_labels = None, test_labels = None, image_trans
   frames_total = sum([len(subset['data']) for subset in subsets])
   for subset in subsets:
     source_dir = os.path.dirname(subset['labels'])
-    target_image_dir = os.path.join(output, "data/images", subset['type'])
-    target_label_dir = os.path.join(output, "data/label", subset['type'])
+    target_image_dir = os.path.join(output, "images", subset['type'])
+    target_label_dir = os.path.join(output, "labels", subset['type'])
 
     # create target directories
     os.makedirs(target_image_dir)
