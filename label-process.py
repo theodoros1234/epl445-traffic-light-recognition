@@ -38,8 +38,12 @@ def find_all_classes(labels, output):
 
 # Converts a BSTLD formatted dataset into the YOLO format
 # TODO: explain parameters
-def convert_to_yolo(output, train_labels = None, test_labels = None, copy = False, merge_color_variants = False, start_id = 0, replace = False):
+def convert_to_yolo(output, train_labels = None, test_labels = None, image_transfer = 'hardlink', merge_color_variants = False, start_id = 0, replace = False):
   WIDTH, HEIGHT = 1280, 720   # image resolution for label conversion
+
+  # check param validity
+  if not image_transfer in ['hardlink', 'symlink-rel', 'symlink-abs', 'copy']:
+    raise ValueError("'image_transfer' must be 'hardlink', 'symlink-rel', 'symlink-abs' or 'copy'")
 
   output = os.path.normpath(output)
   # print("output:", output)
@@ -188,12 +192,20 @@ def convert_to_yolo(output, train_labels = None, test_labels = None, copy = Fals
       src = os.path.join(source_dir, path)
       dst = os.path.join(target_image_dir, filename)
 
-      if copy:
-        # just copy it over
-        shutil.copy(src, dst)
-      else:
+      if image_transfer == 'hardlink':
         # create a hard link to the original
         os.link(src, dst)
+      elif image_transfer == 'symlink-rel':
+        # create a relative symlink to the original
+        symlink = os.path.relpath(src, target_image_dir)
+        os.symlink(symlink, dst)
+      elif image_transfer == 'symlink-abs':
+        # create an absolute symlink to the original
+        symlink = os.path.abspath(src)
+        os.symlink(symlink, dst)
+      elif image_transfer == 'copy':
+        # just copy it over
+        shutil.copy(src, dst)
 
       frames_processed += 1
   print("\r\033[KConverting frame annotations: DONE")
@@ -287,8 +299,30 @@ Coverts dataset from Bosch format to YOLO format.
   --test <path/to/test.yaml>
     Testing set labels
 
+  --hardlink
+    Creates hard links in the converted dataset, which point to the images from
+    the original dataset. This saves disk space and is significantly faster than
+    copying. Both datasets MUST be on the same filesystem (drive or partition).
+    This is the default behavior.
+
+  --symlink-rel
+    Creates relative symbolic links in the converted dataset, which point to the
+    images from the original dataset. This saves disk space and is significantly
+    faster than copying. The two datasets can be on different filesystems and
+    they can be moved together, as long as the relative position to each other
+    remains unchanged.
+
+  --symlink-abs
+    Creates absolute symbolic links in the converted dataset, which point to the
+    images from the original dataset. This saves disk space and is significantly
+    faster than copying. The two datasets can be on different filesystems and
+    the converted dataset can be freely moved, but the original dataset CANNOT
+    be moved.
+
   --copy
-    Copy images to converted dataset, instead of creating links.
+    Copies images to the converted dataset, instead of creating links. This has
+    none of the limitations of linking, but it's slower and it will use
+    significantly more disk space.
 
   --merge-color-variants
     Merge direction variants of color classes into one.
@@ -327,6 +361,9 @@ if __name__ == "__main__":
       args = extract_cmd_args(action, sys.argv[2:], {
         "--train": {"gets_param": True, "required": False},
         "--test": {"gets_param": True, "required": False},
+        "--hardlink": {"gets_param": False, "required": False},
+        "--symlink-rel": {"gets_param": False, "required": False},
+        "--symlink-abs": {"gets_param": False, "required": False},
         "--copy": {"gets_param": False, "required": False},
         "--merge-color-variants": {"gets_param": False, "required": False},
         "--start-id": {"gets_param": True, "required": False},
@@ -347,11 +384,25 @@ if __name__ == "__main__":
         usage(action)
         exit()
 
+      # decide image transfer method
+      image_transfer = 'hardlink'
+      image_transfer_options = []
+      for option in ('--hardlink', '--symlink-rel', '--symlink-abs', '--copy'):
+        if args[0][option]:
+          image_transfer_options.append(option)
+
+      if len(image_transfer_options) > 1:   # conflicting options
+        print("Conflicting options:", ', '.join(image_transfer_options), end='\n\n')
+        usage(action)
+        exit()
+      elif len(image_transfer_options) == 1:
+        image_transfer = image_transfer_options[0][2:] # strip out '--'
+
       convert_to_yolo(
         args[1][0],
         train_labels = args[0]['--train'],
         test_labels = args[0]['--test'],
-        copy = args[0]['--copy'],
+        image_transfer = image_transfer,
         merge_color_variants = args[0]['--merge-color-variants'],
         start_id = start_id,
         replace = args[0]['--replace']
