@@ -293,27 +293,14 @@ def extract_cmd_args(action, args, wanted_options, other_count = None):
 
 # Prints command line usage for all actions or for a specific action
 def usage(action=None):
-  known_actions = {'stats', 'convert'}
-  # if user is trying to use an unknown action, print usage for all actions
-  if action != None and not action in known_actions:
-    print("Unknown action %s\n" % repr(action))
-    action = None
-
-  if action == None:
-    print("Usage: python3 %s <action> [params...]\n" % sys.argv[0])
-  else:
-    print("Usage for action '%s':" % action)
-
-  if action == None or action == 'stats':
-    print("""python3 %s stats <bstld_labels_file.yaml>
+  known_actions = {
+    'stats': """python3 %s stats <bstld_labels_file.yaml>
 Prints the following statistics about a BSTLD-formatted labels file:
 - unique classes
 - instances of each class
 - null frame count and percentage
-""" % sys.argv[0])
-
-  if action == None or action == 'convert':
-    print("""python3 %s convert [options...] <output_path>
+""",
+    'convert': """python3 %s convert [options...] <output_path>
 Coverts dataset from Bosch format to YOLO format.
 
   --train <path/to/train.yaml>
@@ -357,7 +344,25 @@ Coverts dataset from Bosch format to YOLO format.
 
   --replace
     Replace existing output destination without asking.
-""" % sys.argv[0])
+"""
+  }
+
+  if action != None and not action in known_actions:
+  # if user is trying to use an unknown action, print usage for all actions
+    print("Unknown action %s\n" % repr(action))
+    action = None
+
+  if action == None:
+    # no action specified (or it's unknown), print everything
+    print("Usage: python3 %s <action> [params...]\n" % sys.argv[0])
+
+    for a in known_actions:
+      print(known_actions[a] % sys.argv[0])
+
+  else:
+    # print usage for specific action
+    print("Usage for action '%s':" % action)
+    print(known_actions[action] % sys.argv[0])
 
 
 if __name__ == "__main__":
