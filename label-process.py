@@ -10,9 +10,10 @@ Try installing with:
 pip install PyYAML""")
   exit()
 
-# Finds all unique classes in the given file
+# Gives statistics about a BSTLD-formatted dataset:
+# unique classes, instances of each class, null frame count
 # output can be 'print' or 'return'
-def find_all_classes(labels, output):
+def stats(labels, output):
   if type(labels) == str:     # file given
     with open(labels, 'r') as f:
       data = yaml.safe_load(f)
@@ -20,18 +21,35 @@ def find_all_classes(labels, output):
     data = labels
   else:
     raise TypeError("'labels' must be a path string to load from, or a list of parsed data")
-  labels = set()
+  classes = dict()
+  null_frames = 0
 
-  # scan data for labels
+  # scan data for classes
   for entry in data:
     for box in entry['boxes']:
-      labels.add(box['label'])
+      c = box['label']
+      if c in classes:
+        classes[c] += 1
+      else:
+        classes[c] = 1
+
+    if len(entry['boxes']) == 0:
+      null_frames += 1
 
   if output == 'print':
-    for label in labels:
-      print(label)
+    if type(labels) == str:   # file path given, print that first
+      print("Stats for %s:\n" % repr(labels))
+
+    print("Classes:")
+    for c in classes:
+      print("% 5dx %s" % (classes[c], c))
+    print("\nNull frames: %d of %d (%.1f%%)" % (null_frames, len(data), 100 * null_frames / len(data)))
   elif output == 'return':
-    return labels
+    return {
+      "classes": classes,
+      "null_frames": null_frames,
+      "total_frames": len(data)
+    }
   else:
     raise ValueError("invalid output type %s" % repr(output))
 
@@ -103,7 +121,7 @@ def convert_to_yolo(output, train_labels = None, test_labels = None, image_trans
     subset['labels_file'].close()
     subset.pop('labels_file')
     # find classes in dataset
-    classes.update(find_all_classes(data, 'return'))
+    classes.update(stats(data, 'return')['classes'])
 
   # assign IDs to classes
   print("Assigning class IDs")
@@ -275,7 +293,7 @@ def extract_cmd_args(action, args, wanted_options, other_count = None):
 
 # Prints command line usage for all actions or for a specific action
 def usage(action=None):
-  known_actions = ['find-all-classes', 'convert']
+  known_actions = {'stats', 'convert'}
   # if user is trying to use an unknown action, print usage for all actions
   if action != None and not action in known_actions:
     print("Unknown action %s\n" % repr(action))
@@ -286,9 +304,12 @@ def usage(action=None):
   else:
     print("Usage for action '%s':" % action)
 
-  if action == None or action == 'find-all-classes':
-    print("""python3 %s find-all-classes <bstld_labels_file.yaml>
-Finds all unique classes in a BSTLD-formatted labels file and prints them.
+  if action == None or action == 'stats':
+    print("""python3 %s stats <bstld_labels_file.yaml>
+Prints the following statistics about a BSTLD-formatted labels file:
+- unique classes
+- instances of each class
+- null frame count and percentage
 """ % sys.argv[0])
 
   if action == None or action == 'convert':
@@ -352,10 +373,10 @@ if __name__ == "__main__":
     # run action or show usage for bad params
     action = sys.argv[1]
 
-    if action == 'find-all-classes':
+    if action == 'stats':
       if argv_len == 3:
         labels_file = sys.argv[2]
-        find_all_classes(labels_file, 'print')
+        stats(labels_file, 'print')
       else:
         usage(action)
 
