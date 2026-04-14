@@ -84,7 +84,6 @@ def stratified_split_dataset(
 ):
     input_dir = Path(input_dir)
     output_dir = Path(output_dir)
-
     random.seed(seed)
 
     # -----------------------------
@@ -129,30 +128,41 @@ def stratified_split_dataset(
             class_counts[c] += 1
 
     # -----------------------------
-    # 3. Sort: rare-class images first
+    # 3. Separate null frames and annotated frames
     # -----------------------------
-    samples_with_classes.sort(
+    non_null = [(img, lbl, classes) for img, lbl, classes in samples_with_classes if classes]
+    null_samples = [(img, lbl) for img, lbl, classes in samples_with_classes if not classes]
+
+    print(f"Annotated: {len(non_null)}, Null frames: {len(null_samples)}")
+
+    # Split nulls randomly at the same ratio
+    random.shuffle(null_samples)
+    null_split_idx = int(len(null_samples) * split_ratio)
+    null_train = null_samples[:null_split_idx]
+    null_val   = null_samples[null_split_idx:]
+
+    # -----------------------------
+    # 4. Sort: rare-class images first (annotated only)
+    # -----------------------------
+    non_null.sort(
         key=lambda x: sum(class_counts[c] for c in x[2])
     )
 
     # -----------------------------
-    # 4. Greedy stratified split
+    # 5. Greedy stratified split (annotated only)
     # -----------------------------
     train, val = [], []
 
     train_class_counts = defaultdict(int)
     val_class_counts = defaultdict(int)
 
-    target_train_size = int(len(samples_with_classes) * split_ratio)
+    target_train_size = int(len(non_null) * split_ratio)
 
-    for img, lbl, classes in samples_with_classes:
-
-        # compute imbalance score if assigned to train vs val
+    for img, lbl, classes in non_null:
         train_score = 0.0
         val_score = 0.0
 
         for c in classes:
-            # normalized frequency
             train_score += train_class_counts[c] / (class_counts[c] + 1e-6)
             val_score += val_class_counts[c] / (class_counts[c] + 1e-6)
 
@@ -165,17 +175,21 @@ def stratified_split_dataset(
             for c in classes:
                 val_class_counts[c] += 1
 
-    print(f"Train: {len(train)}, Val: {len(val)}")
+    # Merge nulls into their respective splits
+    train += null_train
+    val   += null_val
+
+    print(f"Train: {len(train)} ({len(null_train)} null), Val: {len(val)} ({len(null_val)} null)")
 
     # -----------------------------
-    # 5. Create output structure
+    # 6. Create output structure
     # -----------------------------
     for split in ["train", "val"]:
         (output_dir / "images" / split).mkdir(parents=True, exist_ok=True)
         (output_dir / "labels" / split).mkdir(parents=True, exist_ok=True)
 
     # -----------------------------
-    # 6. File transfer helper
+    # 7. File transfer helper
     # -----------------------------
     def transfer(src, dst):
         if link_type == "hardlink":
@@ -187,11 +201,10 @@ def stratified_split_dataset(
             shutil.copy(src, dst)
 
     # -----------------------------
-    # 7. Write dataset
+    # 8. Write dataset
     # -----------------------------
     def write_split(data, split_name):
         for img, lbl in data:
-
             uid = make_id(img)
             dst_img = output_dir / "images" / split_name / f"{uid}.png"
             dst_lbl = output_dir / "labels" / split_name / f"{uid}.txt"
@@ -203,7 +216,7 @@ def stratified_split_dataset(
     write_split(val, "val")
 
     # -----------------------------
-    # 8. Done
+    # 9. Done
     # -----------------------------
     shutil.copy(input_dir / "config.yaml", output_dir / "config.yaml")
     print("Stratified split completed.")

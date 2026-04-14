@@ -54,6 +54,103 @@ def stats(labels, output):
     raise ValueError("invalid output type %s" % repr(output))
 
 
+
+
+import yaml
+from pathlib import Path
+from collections import defaultdict
+
+def yolo_stats(dataset_dir, output='print', splits=("train", "val")):
+    """
+    Gives statistics about a YOLO-formatted dataset produced by
+    merge_and_resplit_dataset or stratified_split_dataset.
+
+    Counts: unique classes, instances per class, null frames (per split and total).
+
+    Args:
+        dataset_dir: path to dataset root (contains images/, labels/, config.yaml)
+        output:      'print' or 'return'
+        splits:      which splits to scan, default is both
+    """
+    dataset_dir = Path(dataset_dir)
+
+    # Load class names from config.yaml if available
+    config_path = dataset_dir / "config.yaml"
+    class_names = {}
+    if config_path.exists():
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        # YOLO config.yaml stores names as a list or dict
+        names = config.get("names", {})
+        if isinstance(names, list):
+            class_names = {i: name for i, name in enumerate(names)}
+        elif isinstance(names, dict):
+            class_names = names
+
+    classes = defaultdict(int)   # class_id -> instance count
+    null_frames = defaultdict(int)  # split -> null frame count
+    total_frames = defaultdict(int) # split -> total frame count
+
+    for split in splits:
+        lbl_dir = dataset_dir / "labels" / split
+        if not lbl_dir.exists():
+            continue
+
+        for lbl_path in lbl_dir.glob("*.txt"):
+            total_frames[split] += 1
+            lines = [l.strip() for l in lbl_path.read_text().splitlines() if l.strip()]
+
+            if len(lines) == 0:
+                null_frames[split] += 1
+                continue
+
+            for line in lines:
+                parts = line.split()
+                if parts:
+                    classes[int(parts[0])] += 1
+
+    total = sum(total_frames.values())
+    total_null = sum(null_frames.values())
+
+    if output == 'print':
+        print(f"Stats for: {dataset_dir}\n")
+        print(f"{'Split':<10} {'Frames':>8} {'Null':>8} {'Null %':>8}")
+        print("-" * 38)
+        for split in splits:
+            n = total_frames.get(split, 0)
+            nf = null_frames.get(split, 0)
+            pct = 100 * nf / n if n else 0
+            print(f"{split:<10} {n:>8} {nf:>8} {pct:>7.1f}%")
+        print("-" * 38)
+        pct = 100 * total_null / total if total else 0
+        print(f"{'TOTAL':<10} {total:>8} {total_null:>8} {pct:>7.1f}%")
+
+        print("\nClasses:")
+        for cls_id in sorted(classes):
+            name = class_names.get(cls_id, f"class_{cls_id}")
+            print(f"  {classes[cls_id]:>6}x  [{cls_id}] {name}")
+
+    elif output == 'return':
+        return {
+            "classes": {
+                cls_id: {
+                    "name": class_names.get(cls_id, f"class_{cls_id}"),
+                    "count": classes[cls_id]
+                }
+                for cls_id in sorted(classes)
+            },
+            "null_frames": dict(null_frames),
+            "total_frames": dict(total_frames),
+            "null_frames_total": total_null,
+            "total_frames_total": total,
+        }
+
+    else:
+        raise ValueError("invalid output type %s" % repr(output))
+
+
+
+
 # Converts a BSTLD formatted dataset into the YOLO format
 # TODO: explain parameters
 def convert_to_yolo(output, train_labels = None, test_labels = None, image_transfer = 'hardlink', merge_color_variants = False, start_id = 0, replace = False):
@@ -384,7 +481,14 @@ if __name__ == "__main__":
         stats(labels_file, 'print')
       else:
         usage(action)
-
+    
+    elif action == 'yolo_stats':
+      if argv_len == 3:
+        labels_file = sys.argv[2]
+        yolo_stats(labels_file, 'print')
+      else:
+        usage(action)
+          
     elif action == 'convert':
       args = extract_cmd_args(action, sys.argv[2:], {
         "--train": {"gets_param": True, "required": False},
