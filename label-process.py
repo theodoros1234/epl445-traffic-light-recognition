@@ -61,59 +61,48 @@ from pathlib import Path
 from collections import defaultdict
 
 def yolo_stats(dataset_dir, output='print', splits=("train", "val")):
-    """
-    Gives statistics about a YOLO-formatted dataset produced by
-    merge_and_resplit_dataset or stratified_split_dataset.
-
-    Counts: unique classes, instances per class, null frames (per split and total).
-
-    Args:
-        dataset_dir: path to dataset root (contains images/, labels/, config.yaml)
-        output:      'print' or 'return'
-        splits:      which splits to scan, default is both
-    """
     dataset_dir = Path(dataset_dir)
-
-    # Load class names from config.yaml if available
     config_path = dataset_dir / "config.yaml"
     class_names = {}
     if config_path.exists():
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
-        # YOLO config.yaml stores names as a list or dict
         names = config.get("names", {})
         if isinstance(names, list):
             class_names = {i: name for i, name in enumerate(names)}
         elif isinstance(names, dict):
             class_names = names
 
-    classes = defaultdict(int)   # class_id -> instance count
-    null_frames = defaultdict(int)  # split -> null frame count
-    total_frames = defaultdict(int) # split -> total frame count
+    classes = defaultdict(int)                          # class_id -> total instance count
+    classes_per_split = defaultdict(lambda: defaultdict(int))  # split -> class_id -> count
+    null_frames = defaultdict(int)
+    total_frames = defaultdict(int)
 
     for split in splits:
         lbl_dir = dataset_dir / "labels" / split
         if not lbl_dir.exists():
             continue
-
         for lbl_path in lbl_dir.glob("*.txt"):
             total_frames[split] += 1
             lines = [l.strip() for l in lbl_path.read_text().splitlines() if l.strip()]
-
-            if len(lines) == 0:
+            if not lines:
                 null_frames[split] += 1
                 continue
-
             for line in lines:
                 parts = line.split()
                 if parts:
-                    classes[int(parts[0])] += 1
+                    cls_id = int(parts[0])
+                    classes[cls_id] += 1
+                    classes_per_split[split][cls_id] += 1
 
     total = sum(total_frames.values())
     total_null = sum(null_frames.values())
+    all_cls_ids = sorted(classes)
 
     if output == 'print':
         print(f"Stats for: {dataset_dir}\n")
+
+        # Frames table
         print(f"{'Split':<10} {'Frames':>8} {'Null':>8} {'Null %':>8}")
         print("-" * 38)
         for split in splits:
@@ -125,29 +114,41 @@ def yolo_stats(dataset_dir, output='print', splits=("train", "val")):
         pct = 100 * total_null / total if total else 0
         print(f"{'TOTAL':<10} {total:>8} {total_null:>8} {pct:>7.1f}%")
 
+        # Classes table with per-split columns
         print("\nClasses:")
-        for cls_id in sorted(classes):
+        col_w = 10
+        header = f"  {'ID':<6} {'Name':<20} {'TOTAL':>{col_w}}"
+        for split in splits:
+            header += f"  {split:>{col_w}}"
+        print(header)
+        print("  " + "-" * (28 + (col_w + 2) * (1 + len(splits))))
+        for cls_id in all_cls_ids:
             name = class_names.get(cls_id, f"class_{cls_id}")
-            print(f"  {classes[cls_id]:>6}x  [{cls_id}] {name}")
+            row = f"  {cls_id:<6} {name:<20} {classes[cls_id]:>{col_w}}"
+            for split in splits:
+                row += f"  {classes_per_split[split].get(cls_id, 0):>{col_w}}"
+            print(row)
 
     elif output == 'return':
         return {
             "classes": {
                 cls_id: {
                     "name": class_names.get(cls_id, f"class_{cls_id}"),
-                    "count": classes[cls_id]
+                    "count": classes[cls_id],
+                    "count_per_split": {
+                        split: classes_per_split[split].get(cls_id, 0)
+                        for split in splits
+                    },
                 }
-                for cls_id in sorted(classes)
+                for cls_id in all_cls_ids
             },
             "null_frames": dict(null_frames),
             "total_frames": dict(total_frames),
             "null_frames_total": total_null,
             "total_frames_total": total,
         }
-
     else:
         raise ValueError("invalid output type %s" % repr(output))
-
 
 
 

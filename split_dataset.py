@@ -152,21 +152,25 @@ def stratified_split_dataset(
     # 5. Greedy stratified split (annotated only)
     # -----------------------------
     train, val = [], []
-
     train_class_counts = defaultdict(int)
-    val_class_counts = defaultdict(int)
+    val_class_counts   = defaultdict(int)
 
     target_train_size = int(len(non_null) * split_ratio)
+    target_val_size   = len(non_null) - target_train_size
 
     for img, lbl, classes in non_null:
-        train_score = 0.0
-        val_score = 0.0
+        train_full = len(train) >= target_train_size
+        val_full   = len(val)   >= target_val_size
 
-        for c in classes:
-            train_score += train_class_counts[c] / (class_counts[c] + 1e-6)
-            val_score += val_class_counts[c] / (class_counts[c] + 1e-6)
+        if not train_full and not val_full:
+            # Both buckets still have room — use class balance as tiebreaker
+            train_score = sum(train_class_counts[c] / (class_counts[c] + 1e-6) for c in classes)
+            val_score   = sum(val_class_counts[c]   / (class_counts[c] + 1e-6) for c in classes)
+            go_train = train_score <= val_score
+        else:
+            go_train = not train_full   # one bucket is full; fill the other
 
-        if len(train) < target_train_size and train_score <= val_score:
+        if go_train:
             train.append((img, lbl))
             for c in classes:
                 train_class_counts[c] += 1
