@@ -6,22 +6,58 @@ UCY EPL445 Project - Traffic light recognition using a YOLO model trained on the
 
 - [PyYAML](https://pyyaml.org)
 - [Ultralytics YOLO](https://github.com/ultralytics/ultralytics)
+- [Streamlit (Optional)](https://streamlit.io/)
 
 ```sh
-pip install ultralytics PyYAML
+pip install ultralytics PyYAML streamlit
 ```
 
 # Usage
 
+## GUI (`gui.py`)
+
+A Streamlit-based interface for the dataset pipeline tools.
+
+##### Run with:
+
+```bash
+pip install streamlit pandas
+streamlit run gui.py
+```
+
+The sidebar selects between five sections:
+
+##### BSTLD Stats
+Shows class counts and null frame statistics for a BSTLD-formatted `.yaml` labels file.
+
+##### YOLO Stats
+Shows a per-split breakdown of class instance counts and null frames for a YOLO-formatted dataset directory.
+
+##### Convert BSTLD → YOLO
+Converts a Bosch-format dataset to YOLO format, with options for image transfer method, color variant merging, and class ID offset.
+
+##### Re-split Dataset
+Merges and re-splits an existing YOLO dataset, either randomly or with stratified balancing to preserve class distribution across splits.
+
+##### View Results
+A lightweight file browser for navigating dataset directories. Displays `.png` / `.jpg` images inline and opens `.csv` files as interactive tables. Includes a breadcrumb trail for easy navigation.
+
+---
+
 ## Label Processing
 
-### Find all unique classes
+### Print BSTLD Stats
 
 ```
-python3 label-process.py find-all-classes <bstld_labels_file.yaml>
+python3 label-process.py stats <bstld_labels_file.yaml>
 ```
 
-Finds all unique classes in a BSTLD-formatted label file and prints them.
+
+### Print YOLO Stats
+
+```
+python3 label-process.py yolo-stats <bstld_labels_file.yaml>
+```
 
 ### Convert to YOLO format
 
