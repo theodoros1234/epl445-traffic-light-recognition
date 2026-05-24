@@ -93,3 +93,21 @@ When choosing class IDs, start counting from this one. Useful for adding new cla
 
 `--replace`  
 Replace existing output destination without asking.
+
+## Inference
+
+### Preview
+
+```
+yolo predict model=/path/to/model.pt source=/path/to/image_or_video.mp4 save=False show
+```
+
+Runs inference on a chosen image or video clip using the selected model. Output is shown in a window as it's being processed.
+
+### Save to file
+
+```
+yolo predict model=/path/to/model.pt source=/path/to/image_or_video.mp4
+```
+
+Runs inference on a chosen image or video clip using the selected model. Output is saved to a file in your Ultralytics runs directory.
