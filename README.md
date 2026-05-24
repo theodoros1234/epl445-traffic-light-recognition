@@ -1,6 +1,6 @@
 # EPL445 Traffic Light Recognition
 
-UCY EPL445 Project - Traffic light recognition using a YOLO model trained on the BSTLD dataset
+UCY EPL445 Project - Traffic light recognition using a YOLO model trained on the [Bosch Small Traffic Lights Dataset](https://zenodo.org/records/12706046)
 
 # Dependencies
 
